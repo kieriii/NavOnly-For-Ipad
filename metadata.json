@@ -1,0 +1,7 @@
+{
+  "name": "iPad Pro-Nav Simulator",
+  "description": "A high-fidelity iPad-optimized navigation application simulator featuring 'Nav Mode' and 'Full Navigation' modes, integrated with a Gemini-powered expert development guide.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
