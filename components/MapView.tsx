@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Compass, Loader2, AlertCircle, Box } from 'lucide-react';
 import { AppMode, LocationData, NavigationState } from '../types';
@@ -16,6 +15,7 @@ declare global {
   interface Window {
     google: any;
     gm_authFailure: () => void;
+    initMap: () => void;
   }
 }
 
@@ -33,13 +33,17 @@ const MapView: React.FC<MapViewProps> = ({ location, navState, mode, apiKey, act
     window.gm_authFailure = () => {
       setError("ApiNotActivatedMapError: Ensure 'Maps JavaScript API' is enabled.");
     };
+    window.initMap = () => {
+      setIsLoaded(true);
+    };
     return () => {
       delete window.gm_authFailure;
+      delete window.initMap;
     };
   }, []);
 
   useEffect(() => {
-    if (window.google) {
+    if (window.google && window.google.maps) {
       setIsLoaded(true);
       return;
     }
@@ -49,10 +53,10 @@ const MapView: React.FC<MapViewProps> = ({ location, navState, mode, apiKey, act
 
     const script = document.createElement('script');
     script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry,places`;
+    // Updated with loading=async and v=beta for modern Places support
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry,places&v=beta&loading=async&callback=initMap`;
     script.async = true;
     script.defer = true;
-    script.onload = () => setIsLoaded(true);
     script.onerror = () => setError("Failed to load Google Maps script.");
     document.head.appendChild(script);
   }, [apiKey]);
@@ -106,7 +110,6 @@ const MapView: React.FC<MapViewProps> = ({ location, navState, mode, apiKey, act
   // Update Route on Map
   useEffect(() => {
     if (directionsRenderer.current) {
-      // FIX: Explicit structural check to avoid InvalidValueError: setDirections: not an Object
       const isValidRoute = routeData && 
                           typeof routeData === 'object' && 
                           Array.isArray(routeData.routes) && 
@@ -118,14 +121,11 @@ const MapView: React.FC<MapViewProps> = ({ location, navState, mode, apiKey, act
         directionsRenderer.current.setDirections(null);
       }
       
-      // Clear old markers
       markers.current.forEach(m => m.setMap(null));
       markers.current = [];
 
       if (isValidRoute) {
         const leg = routeData.routes[0].legs[0];
-        
-        // End Marker
         const endMarker = new window.google.maps.Marker({
           position: leg.end_location,
           map: mapInstance.current,
@@ -205,7 +205,6 @@ const MapView: React.FC<MapViewProps> = ({ location, navState, mode, apiKey, act
       
       <div ref={mapRef} className="w-full h-full" />
 
-      {/* Navigation Puck */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
         <div 
           className="transition-transform duration-150 ease-linear"

@@ -7,7 +7,8 @@ interface BottomPanelProps {
   navState: NavigationState;
   toggleNavMode: () => void;
   toggleTraffic: () => void;
-  onSearch: (dest: string, lat?: number, lng?: number) => void;
+  // Fix: Updated onSearch signature to accept destination and optional origin string instead of lat/lng numbers
+  onSearch: (dest: string, origin?: string) => void;
   onCancel: () => void;
   mode: AppMode;
   activeTheme: 'light' | 'dark';

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Navigation, MessageSquare, AlertTriangle, X } from 'lucide-react';
 import { AppMode, LocationData, NavigationState, ThemeMode } from './types';
@@ -40,29 +39,45 @@ const App: React.FC = () => {
     timestamp: Date.now()
   });
 
-  // Track real geolocation
+  // Improved Geolocation Tracker
   useEffect(() => {
     if (!navigator.geolocation) return;
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        setLocation(prev => ({
-          ...prev,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          heading: pos.coords.heading || prev.heading,
-          speed: (pos.coords.speed || 0) * 2.237, // Convert m/s to mph
-          accuracy: pos.coords.accuracy,
-          timestamp: pos.timestamp
-        }));
-      },
+    let watchId: number;
+
+    const startTracking = () => {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setLocation(prev => ({
+            ...prev,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            heading: pos.coords.heading || prev.heading,
+            speed: (pos.coords.speed || 0) * 2.237, // Convert m/s to mph
+            accuracy: pos.coords.accuracy,
+            timestamp: pos.timestamp
+          }));
+        },
+        (err) => {
+          console.warn(`Geolocation error (${err.code}): ${err.message}`);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    };
+
+    // Request current position first to trigger permission prompt immediately
+    navigator.geolocation.getCurrentPosition(
+      () => startTracking(),
       (err) => {
-        console.warn("Geolocation access denied or unavailable. Using default location.", err);
+        console.warn("Initial geolocation request failed. Retrying in background...");
+        startTracking();
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 5000 }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+    };
   }, []);
 
   const activeTheme = useMemo(() => {
@@ -129,15 +144,12 @@ const App: React.FC = () => {
 
     const directionsService = new window.google.maps.DirectionsService();
     
-    // Convert origin to LatLng if it's the current location
-    // Fixed: Using 'any' to avoid "Cannot find namespace 'google'" type error on line 133
-    let requestOrigin: string | any = origin;
+    let requestOrigin: any = origin;
     if (origin === 'Your Location') {
       requestOrigin = new window.google.maps.LatLng(location.latitude, location.longitude);
     }
 
     try {
-      // Fixed: Using 'any' to avoid "Cannot find namespace 'google'" type error on line 139
       const result = await new Promise<any>((resolve, reject) => {
         directionsService.route({
           origin: requestOrigin,
@@ -150,7 +162,6 @@ const App: React.FC = () => {
         });
       });
 
-      // Crucial: Only set routeData if result is a valid object with routes
       if (result && result.routes && result.routes.length > 0) {
         const leg = result.routes[0].legs[0];
         const steps = leg.steps.map((s: any) => ({
@@ -177,7 +188,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Directions request failed:", error);
-      setRouteData(null); // Ensure invalid data is cleared
+      setRouteData(null);
       if (error === 'REQUEST_DENIED') {
         setApiError("Directions API Denied. Check if 'Directions API' is enabled in Google Cloud Console.");
       } else if (error === 'ZERO_RESULTS') {

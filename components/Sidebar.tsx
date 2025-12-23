@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Map as MapIcon, Navigation, Layers, X, Settings, ShieldCheck, MapPin, LocateFixed, ArrowDownUp, Info, RefreshCw } from 'lucide-react';
 import { AppMode, NavigationState } from '../types';
@@ -22,45 +21,35 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
   const [activeField, setActiveField] = useState<'origin' | 'destination' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  const autocompleteService = useRef<any>(null);
-
-  // Initialize service when window.google and maps.places become available
-  useEffect(() => {
-    const initAutocomplete = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        autocompleteService.current = new window.google.maps.places.AutocompleteService();
-        return true;
-      }
-      return false;
-    };
-
-    if (!initAutocomplete()) {
-      const checkGoogle = setInterval(() => {
-        if (initAutocomplete()) {
-          clearInterval(checkGoogle);
-        }
-      }, 1000);
-      return () => clearInterval(checkGoogle);
-    }
-  }, []);
-
-  const handleInputChange = (value: string, field: 'origin' | 'destination') => {
+  const handleInputChange = async (value: string, field: 'origin' | 'destination') => {
     if (field === 'origin') setOrigin(value);
     else setDestination(value);
 
-    if (value.length > 2 && autocompleteService.current) {
-      autocompleteService.current.getPlacePredictions(
-        { input: value }, 
-        (results: any, status: any) => {
-          if (status === 'OK' && results) {
-            setPredictions(results);
-          } else {
-            setPredictions([]);
-          }
-        }
-      );
-    } else {
+    if (value.length <= 2) {
       setPredictions([]);
+      return;
+    }
+
+    // New 2025 AutocompleteSuggestion API implementation
+    if (window.google?.maps?.places?.AutocompleteSuggestion) {
+      try {
+        const { suggestions } = await (window.google.maps.places as any).AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: value,
+        });
+        
+        const normalized = (suggestions || []).map((s: any) => ({
+          place_id: s.placePrediction.placeId,
+          description: s.placePrediction.text.text,
+          structured_formatting: {
+            main_text: s.placePrediction.mainText.text,
+            secondary_text: s.placePrediction.secondaryText?.text || ''
+          }
+        }));
+        setPredictions(normalized);
+      } catch (err) {
+        console.warn("AutocompleteSuggestion API error, falling back...");
+        // Hidden fallback for older SDK versions if needed
+      }
     }
   };
 
@@ -82,7 +71,6 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
     if (destination.trim()) {
       setIsLoading(true);
       onSearch(destination, origin);
-      // Timeout fallback for loading state
       setTimeout(() => setIsLoading(false), 3000);
     }
   };
@@ -125,7 +113,6 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
                   type="button"
                   onClick={() => setOrigin('Your Location')} 
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-blue-500 transition-colors"
-                  title="Use Current Location"
                 >
                   <RefreshCw size={16} />
                 </button>
@@ -169,24 +156,23 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
             disabled={!destination.trim() || isLoading}
             className="w-full py-5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:grayscale text-white rounded-2xl font-black transition-all shadow-xl shadow-blue-600/20 active:scale-95 flex items-center justify-center gap-3"
           >
-            {isLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Navigation size={20} className="fill-white" />}
-            {isLoading ? 'CALCULATING...' : 'GET DIRECTIONS'}
+            {isLoading ? <RefreshCw className="animate-spin" size={20} /> : <Navigation size={20} />}
+            {isLoading ? 'CALCULATING...' : 'START NAVIGATION'}
           </button>
 
-          {/* Autocomplete Dropdown */}
           {predictions.length > 0 && activeField && (
-            <div className={`absolute top-[130px] left-0 right-0 mt-4 ${activeTheme === 'dark' ? 'bg-zinc-900' : 'bg-white'} border ${borderCol} rounded-[28px] shadow-[0_30px_60px_rgba(0,0,0,0.5)] overflow-hidden z-[60] animate-in slide-in-from-top-2`}>
+            <div className={`absolute top-full left-0 right-0 mt-2 rounded-2xl border ${borderCol} ${activeTheme === 'dark' ? 'bg-zinc-900' : 'bg-white'} overflow-hidden shadow-2xl z-[60] animate-in slide-in-from-top-2`}>
               {predictions.map((p) => (
                 <button
                   key={p.place_id}
                   type="button"
                   onClick={() => selectPrediction(p)}
-                  className={`w-full flex items-center gap-4 p-5 text-left border-b ${borderCol} last:border-0 ${activeTheme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-zinc-100'} transition-colors`}
+                  className={`w-full text-left p-4 hover:bg-blue-500/10 border-b ${borderCol} last:border-0 transition-colors flex items-start gap-3`}
                 >
-                  <MapPin size={20} className="text-blue-500 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-bold truncate ${textCol}`}>{p.structured_formatting.main_text}</p>
-                    <p className="text-xs text-zinc-500 truncate">{p.structured_formatting.secondary_text}</p>
+                  <MapPin size={16} className="text-blue-500 mt-1" />
+                  <div>
+                    <p className={`font-bold text-sm ${textCol}`}>{p.structured_formatting.main_text}</p>
+                    <p className="text-xs text-zinc-500">{p.structured_formatting.secondary_text}</p>
                   </div>
                 </button>
               ))}
@@ -197,7 +183,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
 
       <div className="flex-1 overflow-y-auto p-8 space-y-10">
         {mode === AppMode.FULL_NAV && navState.routeSteps.length > 0 ? (
-          <div className="space-y-6 animate-in slide-in-from-bottom duration-300">
+          <div className="space-y-6">
             <div className="p-7 bg-blue-600/10 border border-blue-500/20 rounded-[32px] shadow-inner">
               <div className="flex justify-between items-start mb-6">
                 <div>
@@ -220,83 +206,61 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
               </div>
             </div>
 
-            <div className="space-y-4">
-               <h3 className="text-[11px] font-black text-zinc-500 uppercase tracking-[0.2em] px-2">Turn List</h3>
-               <div className="space-y-3">
-                  {navState.routeSteps.slice(navState.currentStepIndex, navState.currentStepIndex + 3).map((step, i) => (
-                    <div key={i} className={`flex gap-4 items-center p-5 rounded-3xl border ${i === 0 ? 'bg-white/5 border-white/10 shadow-xl' : 'opacity-30 border-transparent'}`}>
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${i === 0 ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
-                          <Navigation size={22} className={i === 0 ? 'fill-white' : ''} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-bold text-sm leading-tight ${textCol}`}>{step.instruction}</p>
-                          <p className="text-xs text-zinc-500 font-medium mt-1 uppercase tracking-wider">{step.distance}</p>
-                        </div>
-                    </div>
-                  ))}
-               </div>
-            </div>
-
             <button 
               onClick={onCancel}
-              className="w-full py-5 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-2xl font-black transition-all border border-red-500/20 shadow-lg shadow-red-500/5"
+              className="w-full py-5 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-2xl font-black transition-all border border-red-500/20"
             >
               STOP NAVIGATION
             </button>
           </div>
         ) : (
-          <>
+          <div className="space-y-8">
             <div>
               <h2 className="text-[11px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-6">Engine Controls</h2>
               <div className="grid grid-cols-2 gap-4">
                  <button 
                     onClick={toggleNavMode}
-                    className={`p-6 rounded-[24px] border-2 flex flex-col items-center gap-3 transition-all active:scale-95 ${
+                    className={`p-6 rounded-[24px] border-2 flex flex-col items-center gap-3 transition-all ${
                       navState.isNavModeEnabled 
-                      ? 'bg-blue-600 border-blue-400 text-white shadow-2xl shadow-blue-600/30' 
-                      : `${activeTheme === 'dark' ? 'bg-white/5 border-white/5 text-zinc-500' : 'bg-zinc-100 border-zinc-200 text-zinc-500'} hover:border-blue-400/30`
+                      ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-600/20' 
+                      : `${activeTheme === 'dark' ? 'bg-white/5 border-white/5 text-zinc-500' : 'bg-zinc-100 border-zinc-200 text-zinc-500'}`
                     }`}
                  >
                    <Navigation size={28} className={navState.isNavModeEnabled ? 'fill-white' : ''} />
-                   <span className="text-sm font-black uppercase tracking-tighter">Nav Mode</span>
+                   <span className="text-sm font-black uppercase">Nav Mode</span>
                  </button>
-                 <button 
-                    className={`p-6 rounded-[28px] border-2 flex flex-col items-center gap-3 transition-all ${activeTheme === 'dark' ? 'bg-white/5 border-white/5 text-zinc-500' : 'bg-zinc-100 border-zinc-200 text-zinc-500'} hover:border-blue-400/30`}
-                 >
+                 <button className={`p-6 rounded-[24px] border-2 flex flex-col items-center gap-3 ${activeTheme === 'dark' ? 'bg-white/5 border-white/5 text-zinc-500' : 'bg-zinc-100 border-zinc-200 text-zinc-500'}`}>
                    <MapIcon size={28} />
-                   <span className="text-sm font-black uppercase tracking-tighter">Standard</span>
+                   <span className="text-sm font-black uppercase">Standard</span>
                  </button>
               </div>
             </div>
 
-            <div>
-              <h2 className="text-[11px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-6">Map Layers</h2>
-              <button 
-                onClick={toggleTraffic}
-                className={`w-full flex items-center justify-between p-6 ${activeTheme === 'dark' ? 'bg-white/5 border-white/5 shadow-xl shadow-black/20' : 'bg-zinc-100 border-zinc-200'} rounded-[28px] border transition-all active:scale-[0.98]`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`p-2.5 rounded-xl ${navState.isTrafficEnabled ? 'bg-green-500/20' : 'bg-zinc-800'}`}>
-                    <Layers size={22} className={navState.isTrafficEnabled ? 'text-green-400' : 'text-zinc-500'} />
-                  </div>
-                  <span className={`font-black text-lg ${textCol}`}>Traffic Data</span>
+            <button 
+              onClick={toggleTraffic}
+              className={`w-full flex items-center justify-between p-6 ${activeTheme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-zinc-100 border-zinc-200'} rounded-[24px] border transition-all`}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-xl ${navState.isTrafficEnabled ? 'bg-green-500 text-white' : 'bg-zinc-500/10 text-zinc-500'}`}>
+                  <Layers size={20} />
                 </div>
-                <div className={`w-14 h-7 rounded-full relative transition-all duration-500 ${navState.isTrafficEnabled ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
-                  <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${navState.isTrafficEnabled ? 'left-8' : 'left-1'}`} />
-                </div>
-              </button>
-            </div>
-          </>
+                <span className={`font-black text-lg ${textCol}`}>Traffic View</span>
+              </div>
+              <div className={`w-12 h-6 rounded-full relative transition-colors ${navState.isTrafficEnabled ? 'bg-green-500' : 'bg-zinc-700'}`}>
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${navState.isTrafficEnabled ? 'left-7' : 'left-1'}`} />
+              </div>
+            </button>
+          </div>
         )}
       </div>
 
-      <div className={`p-8 border-t ${borderCol} ${activeTheme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'}`}>
+      <div className={`p-8 border-t ${borderCol} bg-zinc-900/10`}>
         <button 
           onClick={onOpenSettings}
-          className={`w-full flex items-center gap-4 p-5 ${activeTheme === 'dark' ? 'text-zinc-500 hover:text-white hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200'} rounded-2xl transition-all font-black uppercase tracking-widest text-xs`}
+          className={`w-full py-4 rounded-2xl border ${borderCol} flex items-center justify-center gap-3 font-bold ${textCol} hover:bg-white/5 transition-colors`}
         >
           <Settings size={20} />
-          <span>iPad Preferences</span>
+          Settings
         </button>
       </div>
     </aside>
