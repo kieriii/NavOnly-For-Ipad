@@ -106,13 +106,23 @@ const MapView: React.FC<MapViewProps> = ({ location, navState, mode, apiKey, act
   // Update Route on Map
   useEffect(() => {
     if (directionsRenderer.current) {
-      directionsRenderer.current.setDirections(routeData || null);
+      // FIX: Explicit structural check to avoid InvalidValueError: setDirections: not an Object
+      const isValidRoute = routeData && 
+                          typeof routeData === 'object' && 
+                          Array.isArray(routeData.routes) && 
+                          routeData.routes.length > 0;
+
+      if (isValidRoute) {
+        directionsRenderer.current.setDirections(routeData);
+      } else {
+        directionsRenderer.current.setDirections(null);
+      }
       
       // Clear old markers
       markers.current.forEach(m => m.setMap(null));
       markers.current = [];
 
-      if (routeData) {
+      if (isValidRoute) {
         const leg = routeData.routes[0].legs[0];
         
         // End Marker

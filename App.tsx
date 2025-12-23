@@ -56,8 +56,10 @@ const App: React.FC = () => {
           timestamp: pos.timestamp
         }));
       },
-      (err) => console.warn("Geolocation error:", err),
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      (err) => {
+        console.warn("Geolocation access denied or unavailable. Using default location.", err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
@@ -119,20 +121,23 @@ const App: React.FC = () => {
   }, []);
 
   const startNavigation = async (destination: string, origin: string = 'Your Location') => {
-    if (!window.google) {
-      setApiError("Google Maps library not loaded yet.");
+    if (!window.google || !window.google.maps) {
+      setApiError("Google Maps library not ready. Please wait a moment.");
       return;
     }
     setApiError(null);
 
     const directionsService = new window.google.maps.DirectionsService();
     
-    // Crucial: Use LatLng object if "Your Location" is selected to bypass string parsing errors
-    const requestOrigin = origin === 'Your Location' 
-      ? new window.google.maps.LatLng(location.latitude, location.longitude)
-      : origin;
+    // Convert origin to LatLng if it's the current location
+    // Fixed: Using 'any' to avoid "Cannot find namespace 'google'" type error on line 133
+    let requestOrigin: string | any = origin;
+    if (origin === 'Your Location') {
+      requestOrigin = new window.google.maps.LatLng(location.latitude, location.longitude);
+    }
 
     try {
+      // Fixed: Using 'any' to avoid "Cannot find namespace 'google'" type error on line 139
       const result = await new Promise<any>((resolve, reject) => {
         directionsService.route({
           origin: requestOrigin,
@@ -140,39 +145,45 @@ const App: React.FC = () => {
           travelMode: window.google.maps.TravelMode.DRIVING,
           provideRouteAlternatives: false,
         }, (response, status) => {
-          if (status === 'OK') resolve(response);
+          if (status === 'OK' && response) resolve(response);
           else reject(status);
         });
       });
 
-      const leg = result.routes[0].legs[0];
-      const steps = leg.steps.map((s: any) => ({
-        instruction: s.instructions.replace(/<[^>]*>?/gm, ''),
-        distance: s.distance.text,
-        type: 'straight'
-      }));
+      // Crucial: Only set routeData if result is a valid object with routes
+      if (result && result.routes && result.routes.length > 0) {
+        const leg = result.routes[0].legs[0];
+        const steps = leg.steps.map((s: any) => ({
+          instruction: s.instructions.replace(/<[^>]*>?/gm, ''),
+          distance: s.distance.text,
+          type: 'straight'
+        }));
 
-      setRouteData(result);
-      setNavState(prev => ({ 
-        ...prev, 
-        origin,
-        destination: leg.end_address, 
-        isNavModeEnabled: true,
-        currentStepIndex: 0,
-        routeSteps: steps,
-        totalDistance: leg.distance.text,
-        totalDuration: leg.duration.text
-      }));
-      
-      setMode(AppMode.FULL_NAV);
+        setRouteData(result);
+        setNavState(prev => ({ 
+          ...prev, 
+          origin,
+          destination: leg.end_address, 
+          isNavModeEnabled: true,
+          currentStepIndex: 0,
+          routeSteps: steps,
+          totalDistance: leg.distance.text,
+          totalDuration: leg.duration.text
+        }));
+        
+        setMode(AppMode.FULL_NAV);
+      } else {
+        throw new Error("Invalid route result structure");
+      }
     } catch (error) {
       console.error("Directions request failed:", error);
+      setRouteData(null); // Ensure invalid data is cleared
       if (error === 'REQUEST_DENIED') {
-        setApiError("Directions API Denied. Ensure 'Directions API' is enabled in GCP Console.");
+        setApiError("Directions API Denied. Check if 'Directions API' is enabled in Google Cloud Console.");
       } else if (error === 'ZERO_RESULTS') {
-        setApiError("No route found between these locations.");
+        setApiError("No route found between these locations. Try being more specific.");
       } else {
-        setApiError(`Routing Error: ${error}`);
+        setApiError(`Routing failed: ${error}`);
       }
     }
   };
@@ -231,7 +242,7 @@ const App: React.FC = () => {
                   onClick={() => setIsTutorOpen(true)}
                   className="mt-2 text-xs font-black text-red-100 underline decoration-red-100/30 hover:text-white transition-colors uppercase tracking-widest"
                  >
-                   See Troubleshooting Guide
+                   Troubleshooting Steps
                  </button>
               </div>
               <button onClick={() => setApiError(null)} className="p-2 hover:bg-white/10 rounded-full text-white">

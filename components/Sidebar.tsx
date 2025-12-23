@@ -24,15 +24,24 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
   
   const autocompleteService = useRef<any>(null);
 
-  // Initialize service when window.google becomes available
+  // Initialize service when window.google and maps.places become available
   useEffect(() => {
-    const checkGoogle = setInterval(() => {
+    const initAutocomplete = () => {
       if (window.google && window.google.maps && window.google.maps.places) {
         autocompleteService.current = new window.google.maps.places.AutocompleteService();
-        clearInterval(checkGoogle);
+        return true;
       }
-    }, 500);
-    return () => clearInterval(checkGoogle);
+      return false;
+    };
+
+    if (!initAutocomplete()) {
+      const checkGoogle = setInterval(() => {
+        if (initAutocomplete()) {
+          clearInterval(checkGoogle);
+        }
+      }, 1000);
+      return () => clearInterval(checkGoogle);
+    }
   }, []);
 
   const handleInputChange = (value: string, field: 'origin' | 'destination') => {
@@ -73,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
     if (destination.trim()) {
       setIsLoading(true);
       onSearch(destination, origin);
-      // Loading state reset is handled by App.tsx navigation changes or timeout
+      // Timeout fallback for loading state
       setTimeout(() => setIsLoading(false), 3000);
     }
   };
@@ -116,6 +125,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
                   type="button"
                   onClick={() => setOrigin('Your Location')} 
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-blue-500 transition-colors"
+                  title="Use Current Location"
                 >
                   <RefreshCw size={16} />
                 </button>
@@ -160,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
             className="w-full py-5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:grayscale text-white rounded-2xl font-black transition-all shadow-xl shadow-blue-600/20 active:scale-95 flex items-center justify-center gap-3"
           >
             {isLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Navigation size={20} className="fill-white" />}
-            {isLoading ? 'SEARCHING...' : 'GET DIRECTIONS'}
+            {isLoading ? 'CALCULATING...' : 'GET DIRECTIONS'}
           </button>
 
           {/* Autocomplete Dropdown */}
@@ -241,7 +251,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navState, toggleNavMode, toggleTraffi
               <div className="grid grid-cols-2 gap-4">
                  <button 
                     onClick={toggleNavMode}
-                    className={`p-6 rounded-[28px] border-2 flex flex-col items-center gap-3 transition-all active:scale-95 ${
+                    className={`p-6 rounded-[24px] border-2 flex flex-col items-center gap-3 transition-all active:scale-95 ${
                       navState.isNavModeEnabled 
                       ? 'bg-blue-600 border-blue-400 text-white shadow-2xl shadow-blue-600/30' 
                       : `${activeTheme === 'dark' ? 'bg-white/5 border-white/5 text-zinc-500' : 'bg-zinc-100 border-zinc-200 text-zinc-500'} hover:border-blue-400/30`
