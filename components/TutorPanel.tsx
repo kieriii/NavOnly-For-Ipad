@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Copy, Check, ExternalLink, Lightbulb, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Copy, Check, ExternalLink, Lightbulb, ShieldCheck, Loader2, AlertCircle, Terminal, Key } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 
 interface TutorPanelProps {
@@ -11,17 +10,16 @@ interface TutorPanelProps {
 const TutorPanel: React.FC<TutorPanelProps> = ({ onClose, apiKey = "YOUR_API_KEY_HERE" }) => {
   const steps = [
     {
-      title: "Fixing 'REQUEST_DENIED'",
-      content: `If you see a "Directions request failed: REQUEST_DENIED" error, it means the **Directions API** is not enabled in your Google Cloud Console. 
+      title: "Fixing InvalidKeyMapError",
+      content: `The 'InvalidKeyMapError' is the most common roadblock. It means Google is refusing your key.
 
-Even if the Map is visible, Routing requires its own service enablement. 
-
-**How to Fix:**
-1. Visit [Google Cloud Console](https://console.cloud.google.com/google/maps-apis/library).
-2. Ensure you have selected the correct project associated with your API key.
-3. Search for **"Directions API"** and click **Enable**.
-4. (Optional) Repeat for **"Places API"** for the address lookup.`,
-      code: `// Ensure these services are enabled:\n// - Maps JavaScript API\n// - Directions API (Required for Routing)\n// - Places API (Required for Autocomplete)\n// - Maps SDK for iOS (Required for Native iPad App)`
+**How to Fix in 60 Seconds:**
+1. Open [GCP Library Console](https://console.cloud.google.com/apis/library).
+2. Search for **"Maps JavaScript API"** and click **ENABLE**.
+3. Search for **"Directions API"** and click **ENABLE** (essential for routing).
+4. Go to **Billing** and ensure your project has an active credit card or trial linked.
+5. If you restricted your key, ensure the current domain is whitelisted.`,
+      code: "// GCP Console Diagnostic Checklist:\n// 1. Project Selection: Correct?\n// 2. Billing Status: Active?\n// 3. API Enablement: Maps JS + Directions enabled?\n// 4. Restrictions: Domain allowed?"
     },
     {
       title: "Step 2: Credential Guarding",
@@ -66,12 +64,12 @@ Even if the Map is visible, Routing requires its own service enablement.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Provide an advanced implementation tip for ${step.title} specifically for an iPad Pro user interface using Swift and Google Navigation SDK. Content context: ${step.content}`,
+        contents: `I am an iOS engineer debugging 'InvalidKeyMapError'. Why might an API key work for basic Maps but fail for Directions or Advanced Markers? Content context: ${step.content}`,
         config: { temperature: 0.8 }
       });
       setAiResponse(response.text);
     } catch (err) {
-      setAiResponse("Tip: For iPad Pro, use a custom DirectionsRenderer styling to match a high-end luxury vehicle HUD. Deep blues and translucent blur backgrounds are standard for premium iPadOS experiences.");
+      setAiResponse("Tip: Check 'API Restrictions' in GCP Console. Often, developers restrict a key to only one API (like Maps JS) but forget to add 'Directions API', causing routing to fail silently or with an auth error.");
     } finally {
       setIsAiLoading(false);
     }
@@ -86,12 +84,12 @@ Even if the Map is visible, Routing requires its own service enablement.
       <div className="p-10 border-b border-white/5 flex items-center justify-between bg-zinc-900/20">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20">
-            <Lightbulb size={28} className="text-white" />
+            <Key size={28} className="text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Expert Guide</h2>
+            <h2 className="text-2xl font-black text-white tracking-tight">Platform Guide</h2>
             <div className="flex items-center gap-2 mt-1">
-               <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Guide {currentStepIndex + 1} / {steps.length}</span>
+               <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Diagnostic {currentStepIndex + 1} / {steps.length}</span>
             </div>
           </div>
         </div>
@@ -103,7 +101,7 @@ Even if the Map is visible, Routing requires its own service enablement.
       <div className="flex-1 overflow-y-auto p-10 space-y-12">
         <div className="space-y-6">
           <h3 className="text-4xl font-black text-white leading-tight italic flex items-center gap-4">
-            {currentStepIndex === 0 && <AlertCircle className="text-blue-500" size={32} />}
+            {currentStepIndex === 0 && <AlertCircle className="text-red-500" size={32} />}
             {step.title}
           </h3>
           <div className="text-xl text-zinc-400 leading-relaxed font-medium whitespace-pre-wrap">
@@ -121,12 +119,12 @@ Even if the Map is visible, Routing requires its own service enablement.
                 CONSULTING GEMINI...
               </>
             ) : (
-              'ASK AI FOR ARCHITECTURE TIPS'
+              'ASK AI ABOUT KEY RESTRICTIONS'
             )}
           </button>
 
           {aiResponse && (
-            <div className="p-8 bg-zinc-900/50 border border-blue-500/10 rounded-[32px] text-zinc-300 italic text-lg leading-relaxed shadow-xl animate-in slide-in-from-top-2">
+            <div className="p-8 bg-zinc-900/50 border border-blue-500/10 rounded-[32px] text-zinc-300 italic text-lg leading-relaxed shadow-xl">
               {aiResponse}
             </div>
           )}
@@ -135,16 +133,16 @@ Even if the Map is visible, Routing requires its own service enablement.
         {step.code && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Code Manifest</span>
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Code Insight</span>
               <button 
                 onClick={handleCopy}
                 className="flex items-center gap-2 text-xs font-black text-blue-500 hover:text-blue-400 transition-colors uppercase"
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? 'Copied' : 'Copy Snippet'}
+                {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <pre className="p-8 bg-black rounded-[28px] border border-white/5 overflow-x-auto text-base font-mono leading-relaxed text-blue-300 shadow-2xl">
+            <pre className="p-8 bg-black rounded-[28px] border border-white/5 overflow-x-auto text-sm font-mono leading-relaxed text-blue-300 shadow-2xl">
               <code>{step.code}</code>
             </pre>
           </div>
@@ -175,16 +173,6 @@ Even if the Map is visible, Routing requires its own service enablement.
           NEXT
           <ChevronRight size={24} />
         </button>
-      </div>
-      
-      <div className="px-10 py-6 bg-zinc-950 text-center">
-        <a 
-          href="https://console.cloud.google.com/" 
-          target="_blank" 
-          className="text-[10px] text-zinc-600 hover:text-blue-500 transition-colors flex items-center justify-center gap-2 font-black tracking-widest uppercase"
-        >
-          Open Cloud Console <ExternalLink size={12} />
-        </a>
       </div>
     </div>
   );

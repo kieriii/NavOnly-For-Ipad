@@ -1,4 +1,3 @@
-
 export enum AppMode {
   NORMAL = 'NORMAL',
   NAV_MODE = 'NAV_MODE',
@@ -6,8 +5,8 @@ export enum AppMode {
 }
 
 export enum ThemeMode {
-  DARK = 'DARK',
   LIGHT = 'LIGHT',
+  DARK = 'DARK',
   SYSTEM = 'SYSTEM'
 }
 
@@ -20,27 +19,18 @@ export interface LocationData {
   timestamp: number;
 }
 
-export interface RouteStep {
-  instruction: string;
-  distance: string;
-  type: 'straight' | 'left' | 'right' | 'arrival' | 'slight_left' | 'slight_right' | 'u_turn';
-}
-
 export interface NavigationState {
   isTrafficEnabled: boolean;
   isNavModeEnabled: boolean;
   origin: string;
   destination: string | null;
   currentStepIndex: number;
-  routeSteps: RouteStep[];
-  theme: ThemeMode;
+  routeSteps: Array<{
+    instruction: string;
+    distance: string;
+    type: string;
+  }>;
   totalDistance?: string;
   totalDuration?: string;
-}
-
-export interface TutorStep {
-  id: number;
-  title: string;
-  content: string;
-  code?: string;
+  theme: ThemeMode;
 }

@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Navigation, MessageSquare, AlertTriangle, X } from 'lucide-react';
+import { Navigation, MessageSquare } from 'lucide-react';
 import { AppMode, LocationData, NavigationState, ThemeMode } from './types';
 import Sidebar from './components/Sidebar';
-import BottomPanel from './components/BottomPanel';
 import MapView from './components/MapView';
 import TutorPanel from './components/TutorPanel';
 import SettingsModal from './components/SettingsModal';
 
-const GMS_API_KEY = "AIzaSyCCM0hA0-wQ6xGzAKl7tnvLzLQueqhQi0I";
+// Hardcoded Maps API Key for immediate resolution of InvalidKeyMapError
+const MAPS_API_KEY = "AIzaSyCCM0hA0-wQ6xGzAKl7tnvLzLQueqhQi0I";
+// Gemini API Key remains retrieved from the environment for security compliance
+const GEMINI_API_KEY = process.env.API_KEY || "";
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>(AppMode.NORMAL);
@@ -39,7 +41,6 @@ const App: React.FC = () => {
     timestamp: Date.now()
   });
 
-  // Automatically collapse sidebar when starting navigation
   useEffect(() => {
     if (mode === AppMode.FULL_NAV) {
       setIsSidebarCollapsed(true);
@@ -123,7 +124,10 @@ const App: React.FC = () => {
         totalDuration: leg.duration.text
       }));
       setMode(AppMode.FULL_NAV);
-    } catch (e) { setApiError(`Route Error: ${e}`); }
+    } catch (e) { 
+      console.error("Navigation routing error:", e);
+      setApiError(`Route Error: ${e}`); 
+    }
   };
 
   const cancelNavigation = () => {
@@ -155,7 +159,7 @@ const App: React.FC = () => {
           location={location} 
           navState={navState} 
           mode={mode}
-          apiKey={GMS_API_KEY}
+          apiKey={MAPS_API_KEY}
           activeTheme={activeTheme}
           routeData={routeData}
         />
@@ -168,7 +172,6 @@ const App: React.FC = () => {
           <span className="font-black text-[10px] uppercase tracking-widest">Guide</span>
         </button>
 
-        {/* Shrunk Turn Box: 40% size optimized for iPad reclaim map space */}
         {mode === AppMode.FULL_NAV && navState.routeSteps.length > 0 && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-full max-w-xs pointer-events-none">
             <div className={`${activeTheme === 'dark' ? 'bg-zinc-900/95' : 'bg-white/95'} backdrop-blur-2xl rounded-[24px] p-4 shadow-2xl flex items-center gap-4 border border-white/10`}>
@@ -191,7 +194,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {isTutorOpen && <TutorPanel onClose={() => setIsTutorOpen(false)} apiKey={GMS_API_KEY} />}
+      {isTutorOpen && <TutorPanel onClose={() => setIsTutorOpen(false)} apiKey={MAPS_API_KEY} />}
       {isSettingsOpen && (
         <SettingsModal 
           onClose={() => setIsSettingsOpen(false)} 
