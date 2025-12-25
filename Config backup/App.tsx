@@ -39,36 +39,6 @@ const App: React.FC = () => {
     timestamp: Date.now()
   });
 
-  // --- FIX 1: Trigger Native Location Permissions ---
-  useEffect(() => {
-    const requestNativePermission = async () => {
-      // Access the native Capacitor Google Maps plugin to trigger the Blue Dot
-      const capacitorMap = (window as any).Capacitor?.Plugins?.GoogleMaps;
-      if (capacitorMap) {
-        try {
-          await capacitorMap.enableCurrentLocation({ enabled: true });
-        } catch (e) {
-          console.warn("Native location enable failed, falling back to web geolocator", e);
-        }
-      }
-    };
-    requestNativePermission();
-  }, []);
-
-  // --- FIX 2: Handle Map Resizing (Fixes White Space) ---
-  useEffect(() => {
-    // We wait 350ms to allow the sidebar's CSS transition to finish 
-    const timer = setTimeout(() => {
-      const google = (window as any).google;
-      if (google && google.maps) {
-        // This tells the native map to stretch and fill the new space
-        google.maps.event.trigger(window, 'resize');
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [isSidebarCollapsed]); // Runs every time sidebar is toggled
-
   useEffect(() => {
     if (mode === AppMode.FULL_NAV) {
       setIsSidebarCollapsed(true);
@@ -166,6 +136,7 @@ const App: React.FC = () => {
   };
 
   return (
+    /* Changed: Removed solid background colors so map is visible behind the UI */
     <div className={`flex h-screen w-screen overflow-hidden bg-transparent relative transition-colors duration-500`}>
       {orientation === 'landscape' && (
         <Sidebar 
@@ -182,6 +153,7 @@ const App: React.FC = () => {
         />
       )}
 
+      /* Changed: Removed bg-zinc-950 to allow transparency */
       <main className="flex-1 relative bg-transparent overflow-hidden">
         <MapView 
           location={location} 
